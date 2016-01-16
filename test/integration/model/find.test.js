@@ -296,14 +296,18 @@ describe(Support.getTestDialectTeaser('Model'), function() {
         var self = this;
         self.Task = self.sequelize.define('Task', { title: Sequelize.STRING });
         self.Worker = self.sequelize.define('Worker', { name: Sequelize.STRING });
+        this.SubTask = self.sequelize.define('SubTask', { item: Sequelize.STRING });
 
         this.init = function(callback) {
           return self.sequelize.sync({ force: true }).then(function() {
             return self.Worker.create({ name: 'worker' }).then(function(worker) {
               return self.Task.create({ title: 'homework' }).then(function(task) {
-                self.worker = worker;
-                self.task = task;
-                return callback();
+                return self.SubTask.create({ item: 'social studies' }).then(function(subTask) {
+                  self.worker = worker;
+                  self.task = task;
+                  self.subTask = subTask;
+                  return callback();
+                });
               });
             });
           });
@@ -889,6 +893,28 @@ describe(Support.getTestDialectTeaser('Model'), function() {
               expect(this.tags[1].getProducts()).to.eventually.have.length(3),
               expect(this.products[1].getTags()).to.eventually.have.length(1)
             ]);
+          });
+        });
+
+        it('automatically adds necessary join attributes', function() {
+          var self = this
+          this.Task.belongsTo(this.Worker)
+          this.Task.hasMany(this.SubTask)
+          return this.init(function() {
+            return self.task.setWorker(self.worker).then(function() {
+              return self.task.addSubTask(self.subTask);
+            }).then(function() {
+              return self.Task.find({
+                attributes: ['id'],
+                where: { title: 'homework' },
+                include: [ self.Worker, self.SubTask ]
+              });
+            }).then(function(task) {
+                expect(task).to.exist
+                expect(task.Worker).to.exist
+                expect(task.Worker.name).to.equal('worker')
+                expect(task.SubTasks[0].item).to.equal('social studies')
+            });
           });
         });
       });
